@@ -7,7 +7,7 @@ module Main where
 import           Control.Exception
 import           Control.Monad
 import           Control.Monad.Trans.Resource
-import           Data.Aeson                   (encode, toJSON)
+import           Data.Aeson                   (encode, toJSON, ToJSON)
 import qualified Data.ByteString.Char8        as BS
 import           Data.ByteString.Lazy         (toStrict)
 import           Data.Conduit
@@ -63,13 +63,13 @@ groupL items f =
 
 
 
-sinkGroup :: (FilePath, [Log]) -> IO ()
-sinkGroup (fp,logs) =
+sinkGroup :: (ToJSON b) => (a -> b) -> (FilePath, [a]) -> IO ()
+sinkGroup f (fp,logs) =
   runConduitRes $
   CL.sourceList logs
   .| CL.map stringify
   .| B.sinkFile fp
-  where stringify log = BS.snoc (toStrict $ encode $ toJSON $ toOutputLog log) '\n'
+  where stringify log = BS.snoc (toStrict $ encode $ toJSON $ f log) '\n'
 
 
 
@@ -86,7 +86,7 @@ main = do
         let rows = lines content
             cLogs = map (parseLog . T.pack) rows
             grouped = M.toList $ groupL cLogs (logFilePath dir)
-            sinks = map sinkGroup grouped
+            sinks = map (sinkGroup toOutputLog) grouped
         sequence_ sinks
 
 
