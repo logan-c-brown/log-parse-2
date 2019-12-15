@@ -1,17 +1,17 @@
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric #-}
 module Lib where
-import Control.Applicative
-import GHC.Generics
-import Data.Text
-import Data.Attoparsec.Text as P
-import Data.Char (isSpace, isDigit)
+import           Control.Applicative
+import           Data.Attoparsec.Text as P
+import           Data.Char            (isDigit, isSpace)
+import           Data.Text
+import           GHC.Generics
 
 
 
-data KernelLog = KernelLog DateFormat Machine EventTime Device Event 
-               | UnknownLog Text String 
-               deriving (Show)
+data Log = KernelLog DateFormat Machine EventTime Device Event
+         | UnknownLog Text String
+         deriving (Show)
 
 data CpuState = Online
               | Normal
@@ -23,7 +23,7 @@ data CpuState = Online
 newtype CpuNum = CpuNum Text deriving (Show)
 
 data Event = Event GenericMessage
-           | Cpu CpuNum CpuState 
+           | Cpu CpuNum CpuState
            deriving (Show)
 
 data DateFormat = DateFormat Text Text Text  deriving (Show)
@@ -51,7 +51,7 @@ timeP :: Parser EventTime
 timeP = do string "kernel: [" >> skipSpace
            num <- double
            string "]"
-           return $ EventTime num
+           pure $ EventTime num
 
 deviceP :: Parser Device
 deviceP = Device <$> ((P.takeWhile1 (/= ':') <* string ":" )
@@ -66,7 +66,7 @@ cpuNumP = do string "CPU"
 
 
 cpuStateP :: Parser CpuState
-cpuStateP = 
+cpuStateP =
         (string "Package temperature/speed normal" <* takeText >> return Normal )
     <|> (string "Core temperature/speed normal" <* takeText    >> return Normal )
     <|> (string "Core temperature above threshold" <* takeText >> return AboveNormal )
@@ -84,12 +84,12 @@ cpuP = do num <- cpuNumP
 
 
 eventP :: Parser Event
-eventP = cpuP <* takeText 
+eventP = cpuP <* takeText
      <|> Event . GenericMessage <$> takeText
 
      --Dec 14 14:23:40 x1e kernel: [ 9956.910816] mce: CPU3: Package temperature/speed normal
 
-kernelLogP :: Parser KernelLog
+kernelLogP :: Parser Log
 kernelLogP = do date <- dateP
                 skipSpace
                 machine <- machineP
@@ -102,8 +102,8 @@ kernelLogP = do date <- dateP
                 pure $ KernelLog date machine time device event
 
 
-parseLog :: Text -> KernelLog
+parseLog :: Text -> Log
 parseLog s = case parseOnly kernelLogP s of
-               Left err -> UnknownLog s err
+               Left err        -> UnknownLog s err
                Right parsedLog -> parsedLog
 
